@@ -37,9 +37,9 @@ const translations = {
     signupSuccessDesc: 'Your account has been created.',
     signupFailTitle: 'Signup Failed',
     googleFailTitle: 'Google Sign-Up Failed',
-    googleFailDescDefault: 'Google Sign-Up failed. Please try again.',
+    googleFailDescDefault: 'Google Sign-Up failed. Please try again. Ensure Google Sign-In is enabled in your Firebase project settings.',
     googleFailDescCancelled: 'Sign-up cancelled.',
-    googleFailDescExists: 'An account already exists with this email using a different sign-in method.',
+    googleFailDescExists: 'An account already exists with this email. Try logging in or use a different email.',
     defaultError: 'Failed to create account. Please try again.',
     emailInUseError: 'This email address is already in use.',
     weakPasswordError: 'Password should be at least 6 characters.',
@@ -66,9 +66,9 @@ const translations = {
     signupSuccessDesc: 'Tài khoản của bạn đã được tạo.',
     signupFailTitle: 'Đăng ký thất bại',
     googleFailTitle: 'Đăng ký Google thất bại',
-    googleFailDescDefault: 'Đăng ký bằng Google thất bại. Vui lòng thử lại.',
+    googleFailDescDefault: 'Đăng ký bằng Google thất bại. Vui lòng thử lại. Đảm bảo rằng đăng nhập Google đã được bật trong cài đặt dự án Firebase của bạn.',
     googleFailDescCancelled: 'Đã hủy đăng ký.',
-    googleFailDescExists: 'Tài khoản đã tồn tại với email này bằng phương thức đăng nhập khác.',
+    googleFailDescExists: 'Tài khoản đã tồn tại với email này. Hãy thử đăng nhập hoặc sử dụng email khác.',
     defaultError: 'Không thể tạo tài khoản. Vui lòng thử lại.',
     emailInUseError: 'Địa chỉ email này đã được sử dụng.',
     weakPasswordError: 'Mật khẩu phải có ít nhất 6 ký tự.',
@@ -122,7 +122,7 @@ export default function SignupPage() {
         displayName: user.email, // Default display name to email
         createdAt: serverTimestamp(),
         subscriptionTier: initialSubscriptionTier,
-        // Add any other initial user data here
+        lastLogin: serverTimestamp(),
       });
 
 
@@ -154,59 +154,66 @@ export default function SignupPage() {
    const handleGoogleSignUp = async () => {
     if (!auth || !db || !googleAuthProvider) {
         setError(strings.firebaseInitError);
+        toast({
+            title: strings.googleFailTitle,
+            description: "Firebase services not available. Please check configuration.",
+            variant: 'destructive',
+        });
         return;
     }
     setLoadingGoogle(true);
     setError(null);
-    const provider = new googleAuthProvider();
+    const provider = new googleAuthProvider(); // Instantiate the provider
 
     try {
         const result = await signInWithPopup(auth, provider);
         const user = result.user;
 
-        // Check if user document already exists (e.g., signed up via email before)
+        // Check if user document already exists
         const userDocRef = doc(db, 'users', user.uid);
         const docSnap = await getDoc(userDocRef);
 
         if (!docSnap.exists()) {
-             // Create new user document
+             // Create new user document if they don't exist
              await setDoc(userDocRef, {
                 uid: user.uid,
                 email: user.email,
                 displayName: user.displayName,
                 photoURL: user.photoURL,
                 createdAt: serverTimestamp(),
-                subscriptionTier: 'free',
+                subscriptionTier: 'free', // Default tier
+                lastLogin: serverTimestamp(),
             });
              toast({
                 title: strings.signupSuccessTitle,
                 description: strings.welcomeToSPAT,
              });
         } else {
-             // User exists, potentially update info (like display name/photo if changed)
-            await updateDoc(userDocRef, {
-                displayName: user.displayName,
-                photoURL: user.photoURL,
-                lastLogin: serverTimestamp(), // Update last login time
+             // User exists, treat as login - update last login time
+             await updateDoc(userDocRef, {
+                 displayName: user.displayName, // Update potentially changed info
+                 photoURL: user.photoURL,
+                lastLogin: serverTimestamp(),
              });
              toast({
-                 title: strings.signupSuccessTitle, // Or maybe "Login Successful" if they already existed
+                 title: strings.loginPrompt, // Use login prompt title as they exist
                  description: 'Welcome back!',
              });
         }
-        router.push('/dashboard');
+        router.push('/dashboard'); // Redirect after sign-up or login
     } catch (error: any) {
          console.error("Google Sign-Up/Sign-In error:", error);
          let message = strings.googleFailDescDefault;
-         if (error.code === 'auth/popup-closed-by-user') {
+         if (error.code === 'auth/popup-closed-by-user' || error.code === 'auth/cancelled-popup-request') {
              message = strings.googleFailDescCancelled;
          } else if (error.code === 'auth/account-exists-with-different-credential') {
-             // This case is crucial: the user might have an account with the same email but via password.
-             // You might want to guide them to the login page instead.
+             // User might have signed up with email/password first. Guide them to log in.
               message = strings.googleFailDescExists;
-             // Optionally redirect or provide a specific link
-              // router.push('/login?error=account-exists');
+         } else if (error.code === 'auth/popup-blocked') {
+             message = "Pop-up blocked by browser. Please allow pop-ups for this site.";
          }
+         // Add other specific error codes as needed
+
          setError(message);
          toast({
              title: strings.googleFailTitle,
@@ -280,6 +287,7 @@ export default function SignupPage() {
             <Separator className="flex-grow" />
           </div>
 
+           {/* Ensure Firebase is configured correctly in the Firebase console for Google Sign-In */}
           <Button
             variant="outline"
             className="w-full"

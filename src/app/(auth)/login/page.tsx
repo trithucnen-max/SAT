@@ -33,7 +33,7 @@ const translations = {
     loginSuccessDesc: 'Welcome back!',
     loginFailTitle: 'Login Failed',
     googleFailTitle: 'Google Sign-In Failed',
-    googleFailDescDefault: 'Google Sign-In failed. Please try again.',
+    googleFailDescDefault: 'Google Sign-In failed. Please try again. Ensure Google Sign-In is enabled in your Firebase project settings.',
     googleFailDescCancelled: 'Sign-in cancelled.',
     googleFailDescExists: 'An account already exists with this email using a different sign-in method.',
   },
@@ -55,7 +55,7 @@ const translations = {
     loginSuccessDesc: 'Chào mừng trở lại!',
     loginFailTitle: 'Đăng nhập thất bại',
     googleFailTitle: 'Đăng nhập Google thất bại',
-    googleFailDescDefault: 'Đăng nhập bằng Google thất bại. Vui lòng thử lại.',
+    googleFailDescDefault: 'Đăng nhập bằng Google thất bại. Vui lòng thử lại. Đảm bảo rằng đăng nhập Google đã được bật trong cài đặt dự án Firebase của bạn.',
     googleFailDescCancelled: 'Đã hủy đăng nhập.',
     googleFailDescExists: 'Tài khoản đã tồn tại với email này bằng phương thức đăng nhập khác.',
   },
@@ -108,35 +108,46 @@ export default function LoginPage() {
 
   const handleGoogleSignIn = async () => {
     if (!auth || !db || !googleAuthProvider) {
+        // Ensure Firebase services and the Google Auth Provider are available
         setError("Firebase services not available.");
+        toast({
+            title: strings.googleFailTitle,
+            description: "Firebase services not available. Please check configuration.",
+            variant: 'destructive',
+        });
         return;
     }
     setLoadingGoogle(true);
     setError(null);
-    const provider = new googleAuthProvider();
+    const provider = new googleAuthProvider(); // Instantiate the provider
 
     try {
         const result = await signInWithPopup(auth, provider);
         const user = result.user;
 
+        // Check if user document exists, create or update as needed
         const userDocRef = doc(db, 'users', user.uid);
         const docSnap = await getDoc(userDocRef);
 
         if (!docSnap.exists()) {
+            // New user via Google Sign-In
             await setDoc(userDocRef, {
                 uid: user.uid,
                 email: user.email,
                 displayName: user.displayName,
                 photoURL: user.photoURL,
                 createdAt: serverTimestamp(),
-                subscriptionTier: 'free',
+                subscriptionTier: 'free', // Default tier for new users
+                lastLogin: serverTimestamp(),
             });
             toast({
-                title: strings.loginSuccessTitle, // Using login success for new Google user too
-                description: 'Welcome to SPAT!', // Custom welcome for new user
+                title: strings.loginSuccessTitle,
+                description: 'Welcome to SPAT!',
             });
         } else {
+            // Existing user logging in via Google
              await updateDoc(userDocRef, {
+                 // Update potentially changed info from Google profile
                  displayName: user.displayName,
                  photoURL: user.photoURL,
                  lastLogin: serverTimestamp(),
@@ -146,15 +157,20 @@ export default function LoginPage() {
                 description: strings.loginSuccessDesc,
             });
         }
-        router.push('/dashboard');
+        router.push('/dashboard'); // Redirect after successful sign-in/update
     } catch (error: any) {
         console.error("Google Sign-In error:", error);
         let message = strings.googleFailDescDefault;
-        if (error.code === 'auth/popup-closed-by-user') {
+        // Handle specific Firebase Auth errors for Google Sign-In
+        if (error.code === 'auth/popup-closed-by-user' || error.code === 'auth/cancelled-popup-request') {
             message = strings.googleFailDescCancelled;
         } else if (error.code === 'auth/account-exists-with-different-credential') {
              message = strings.googleFailDescExists;
+        } else if (error.code === 'auth/popup-blocked') {
+             message = "Pop-up blocked by browser. Please allow pop-ups for this site.";
         }
+        // Add other specific error codes as needed
+
         setError(message);
         toast({
             title: strings.googleFailTitle,
@@ -215,6 +231,7 @@ export default function LoginPage() {
             <Separator className="flex-grow" />
           </div>
 
+          {/* Ensure Firebase is configured correctly in the Firebase console for Google Sign-In */}
           <Button
             variant="outline"
             className="w-full"
