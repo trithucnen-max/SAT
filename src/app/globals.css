@@ -3,7 +3,7 @@
 @tailwind utilities;
 
 body {
-  font-family: var(--font-geist-sans), Arial, Helvetica, sans-serif;
+  font-family: var(--font-inter), Arial, Helvetica, sans-serif; /* Use Inter font variable */
 }
 
 @layer base {
@@ -43,10 +43,21 @@ body {
     --chart-5: 27 87% 67%;
 
     --radius: 0.5rem;
+
+    /* Sidebar specific variables */
+    --sidebar-background: 222.2 84% 4.9%; /* Dark background for sidebar */
+    --sidebar-foreground: 210 40% 98%; /* Light text for sidebar */
+    --sidebar-primary: 206 72% 65%; /* Lighter Soft Blue for accents */
+    --sidebar-primary-foreground: 222.2 47.4% 11.2%; /* Darker text on primary accent */
+    --sidebar-accent: 217.2 32.6% 17.5%; /* Slightly lighter dark for hover/active */
+    --sidebar-accent-foreground: 210 40% 98%; /* Light text on accent */
+    --sidebar-border: 217.2 32.6% 17.5%; /* Border color matching accent */
+    --sidebar-ring: 206 72% 65%; /* Ring color matching primary */
+
   }
 
   .dark {
-    /* Define dark mode colors - Keeping light theme for now */
+    /* Define dark mode colors - Using sidebar colors as base dark theme for now */
     --background: 222.2 84% 4.9%;
     --foreground: 210 40% 98%;
 
@@ -80,6 +91,16 @@ body {
     --chart-3: 217 32.6% 37.5%; /* Darker Gray/Blue */
     --chart-4: 43 74% 66%;
     --chart-5: 27 87% 67%;
+
+     /* Ensure sidebar variables are also defined for dark mode if needed */
+     --sidebar-background: 222.2 84% 4.9%;
+     --sidebar-foreground: 210 40% 98%;
+     --sidebar-primary: 206 72% 65%;
+     --sidebar-primary-foreground: 222.2 47.4% 11.2%;
+     --sidebar-accent: 217.2 32.6% 17.5%;
+     --sidebar-accent-foreground: 210 40% 98%;
+     --sidebar-border: 217.2 32.6% 17.5%;
+     --sidebar-ring: 206 72% 65%;
   }
 }
 

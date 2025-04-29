@@ -1,15 +1,17 @@
 import type {Metadata} from 'next';
-import {Geist_Sans as GeistSans} from 'next/font/google';
+import { Inter } from 'next/font/google'; // Import Inter from next/font/google
 import './globals.css';
 import {cn} from '@/lib/utils';
 import {Toaster} from '@/components/ui/toaster';
 import {AuthProvider} from '@/context/AuthContext'; // Import AuthProvider
 import {FirebaseProvider} from '@/context/FirebaseContext'; // Import FirebaseProvider
 
-const geistSans = GeistSans({
-  variable: '--font-geist-sans',
+// Instantiate Inter font
+const inter = Inter({
   subsets: ['latin'],
+  variable: '--font-inter', // Define a CSS variable for the font
 });
+
 
 export const metadata: Metadata = {
   title: 'SPAT - SAT Prep Adaptive Tool',
@@ -23,11 +25,11 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
+    <html lang="en" className={inter.variable}> {/* Add font variable to html tag */}
       <body
         className={cn(
-          'min-h-screen bg-background font-sans antialiased',
-          geistSans.variable
+          'min-h-screen bg-background font-sans antialiased'
+          // Removed the direct font variable here as it's applied to <html>
         )}
       >
         <FirebaseProvider>
