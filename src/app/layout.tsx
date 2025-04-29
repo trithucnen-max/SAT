@@ -1,5 +1,5 @@
 import type {Metadata} from 'next';
-import { Inter } from 'next/font/google'; // Import Inter from next/font/google
+import { Inter } from 'next/font/google';
 import './globals.css';
 import {cn} from '@/lib/utils';
 import {Toaster} from '@/components/ui/toaster';
@@ -25,11 +25,10 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className={inter.variable}> {/* Add font variable to html tag */}
+    <html lang="en" className={inter.variable}>
       <body
         className={cn(
           'min-h-screen bg-background font-sans antialiased'
-          // Removed the direct font variable here as it's applied to <html>
         )}
       >
         <FirebaseProvider> {/* Wrap with FirebaseProvider */}
