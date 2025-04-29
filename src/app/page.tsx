@@ -1,27 +1,32 @@
-'use client';
+'use client'; // Keep client component for potential future interactivity if needed
 
 import Link from 'next/link';
-import {Button} from '@/components/ui/button';
-import {useAuth} from '@/context/AuthContext';
+import { Button } from '@/components/ui/button';
+import { useAuth } from '@/context/AuthContext';
 import { useRouter } from 'next/navigation';
-import { useEffect } from 'react';
+import { useEffect } from 'react'; // Keep useEffect temporarily
+
+// This page might become redundant if all users immediately go to /dashboard
+// However, keeping it allows for a public-facing landing page if needed later.
 
 export default function Home() {
-  const {currentUser} = useAuth();
-  const router = useRouter();
+    const { currentUser, loading, isGuest } = useAuth();
+    const router = useRouter();
 
-  useEffect(() => {
-    if (currentUser) {
-      router.push('/dashboard');
+     // Redirect logged-in users to dashboard immediately.
+     // Guests will see the landing page.
+    useEffect(() => {
+        if (!loading && currentUser && !isGuest) {
+         router.replace('/dashboard'); // Use replace to avoid back button issues
+        }
+    }, [currentUser, loading, isGuest, router]);
+
+     // Show loading state while auth is being checked
+    if (loading || (currentUser && !isGuest)) {
+        return <div className="flex min-h-screen items-center justify-center">Loading...</div>;
     }
-  }, [currentUser, router]);
 
-
-  if (currentUser) {
-    // Optional: Show loading or redirecting state
-    return <div className="flex min-h-screen items-center justify-center">Loading...</div>;
-  }
-
+  // Render landing page content for guests or if auth hasn't finished
   return (
     <div className="flex flex-col min-h-screen">
       <header className="px-4 lg:px-6 h-14 flex items-center border-b">
@@ -50,6 +55,10 @@ export default function Home() {
           <Link href="/signup" prefetch={false}>
             <Button size="sm">Sign Up</Button>
           </Link>
+           {/* Optionally add a "Continue as Guest" button */}
+           {/* <Link href="/dashboard" prefetch={false}>
+               <Button size="sm" variant="outline">Continue as Guest</Button>
+           </Link> */}
         </nav>
       </header>
       <main className="flex-1">
@@ -67,11 +76,11 @@ export default function Home() {
                 </div>
                 <div className="flex flex-col gap-2 min-[400px]:flex-row">
                    <Link href="/signup" prefetch={false}>
-                    <Button size="lg">Get Started for Free</Button>
+                    <Button size="lg">Get Started (Sign Up)</Button>
                   </Link>
-                   <Link href="#features" prefetch={false}>
+                   <Link href="/dashboard" prefetch={false}> {/* Link to dashboard for guests */}
                       <Button variant="outline" size="lg">
-                        Learn More
+                        Try as Guest
                       </Button>
                   </Link>
                 </div>
@@ -109,7 +118,7 @@ export default function Home() {
                  <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-10 w-10 text-primary"><path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1 0-5H20" /></svg>
                   <h3 className="text-xl font-bold">Detailed Explanations</h3>
                   <p className="text-muted-foreground">
-                    Understand the reasoning behind every answer with clear, step-by-step explanations (Premium feature).
+                    Understand the reasoning behind every answer with clear, step-by-step explanations (Login Required).
                   </p>
                 </div>
                 <div className="flex flex-col justify-center space-y-4 items-center text-center p-4 rounded-lg border bg-card shadow-sm">
@@ -128,13 +137,16 @@ export default function Home() {
             <div className="space-y-3">
                 <h2 className="text-3xl font-bold tracking-tighter md:text-4xl/tight">Ready to Boost Your SAT Score?</h2>
                 <p className="mx-auto max-w-[600px] text-muted-foreground md:text-xl/relaxed lg:text-base/relaxed xl:text-xl/relaxed">
-                Sign up today and start your adaptive SAT preparation journey with SPAT.
+                 Try SPAT as a guest or sign up to save your progress and unlock detailed explanations.
                 </p>
             </div>
-            <div className="flex justify-center">
+            <div className="flex justify-center gap-4">
                 <Link href="/signup" prefetch={false}>
-                <Button size="lg">Start Practicing Now</Button>
+                    <Button size="lg">Sign Up</Button>
                 </Link>
+                 <Link href="/dashboard" prefetch={false}>
+                    <Button size="lg" variant="outline">Continue as Guest</Button>
+                 </Link>
             </div>
             </div>
         </section>

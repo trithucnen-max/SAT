@@ -8,9 +8,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
-import { CheckCircle, XCircle, Info, ArrowLeft } from 'lucide-react';
-import { useAuth, SubscriptionTier } from '@/context/AuthContext'; // Import subscription tier
-
+import { CheckCircle, XCircle, Info, ArrowLeft, LogIn } from 'lucide-react'; // Added LogIn icon
+import { useAuth, SubscriptionTier, AppUser } from '@/context/AuthContext'; // Import AppUser type
 
 // --- Mock Data & Types ---
 // These should match the structure used when saving results
@@ -34,6 +33,7 @@ interface TestResultDetails {
   totalQuestions: number;
   correctAnswers: number;
   answers: AnswerDetail[];
+  userId?: string; // Optional: To verify ownership if needed
 }
 
 // Mock function to fetch detailed results (replace with actual API call)
@@ -42,39 +42,61 @@ async function fetchDetailedTestResult(resultId: string): Promise<TestResultDeta
   // Simulate API delay
   await new Promise(resolve => setTimeout(resolve, 1000));
 
-  // In a real app, fetch from Firestore using resultId
-  if (resultId === 'result1' || resultId === 'latest') { // Mock data for one result
-    return {
-      id: 'result1',
-      testType: 'Full',
-      dateCompleted: new Date(Date.now() - 86400000),
-      score: 75, // Example score
-      totalQuestions: 4, // Example total
-      correctAnswers: 3, // Example correct
-      answers: [
-        { questionId: 'm1', questionText: 'If 2x + 3 = 7, what is x?', userAnswerId: 'm1b', correctAnswerId: 'm1b', explanation: '2x = 4, x = 2', options: [{id: 'm1a', text: '1'}, {id: 'm1b', text: '2'}, {id: 'm1c', text: '3'}, {id: 'm1d', text: '4'}], isCorrect: true, section: 'Math' },
-        { questionId: 'r1', questionText: 'What is the main idea of the passage?', userAnswerId: 'r1a', correctAnswerId: 'r1c', explanation: 'The main idea is C because...', options: [{id: 'r1a', text: 'Option A'}, {id: 'r1b', text: 'Option B'}, {id: 'r1c', text: 'Correct C'}, {id: 'r1d', text: 'Option D'}], isCorrect: false, section: 'Reading' },
-        { questionId: 'w1', questionText: 'Choose the best correction: dog, chased the ball.', userAnswerId: 'w1d', correctAnswerId: 'w1d', explanation: 'Explanation for W1...', options: [{id: 'w1a', text: 'dog chased'}, {id: 'w1b', text: 'dog, chased,'}, {id: 'w1c', text: 'dog chased,'}, {id: 'w1d', text: 'dog chased'}], isCorrect: true, section: 'Writing' },
-         { questionId: 'm2', questionText: 'What is the area of a circle with radius 3?', userAnswerId: 'm2b', correctAnswerId: 'm2b', explanation: 'Area = πr², so π(3)² = 9π', options: [{id: 'm2a', text: '6π'}, {id: 'm2b', text: '9π'}, {id: 'm2c', text: '3π'}, {id: 'm2d', text: '27π'}], isCorrect: true, section: 'Math' },
-        // Add more answer details matching the number of questions answered
-      ],
-    };
-  }
-   // Handle case where result ID doesn't match mock data
-   if (resultId === 'result2' || resultId === 'result3') {
-      // Simulate finding other results, but maybe with fewer details for brevity
-       return {
-         id: resultId,
-         testType: resultId === 'result2' ? 'Math' : 'Reading',
-         dateCompleted: new Date(Date.now() - (resultId === 'result2' ? 3 : 7) * 86400000),
-         score: resultId === 'result2' ? 90 : 60,
-         totalQuestions: resultId === 'result2' ? 10 : 5,
-         correctAnswers: resultId === 'result2' ? 9 : 3,
-         answers: [], // Keep answers array empty for these mocks for simplicity
-       };
-   }
+  // In a real app, fetch from Firestore using resultId and potentially check ownership
+  const mockResults: { [key: string]: TestResultDetails } = {
+      'result1': {
+        id: 'result1',
+        testType: 'Full',
+        dateCompleted: new Date(Date.now() - 86400000),
+        score: 75,
+        totalQuestions: 4,
+        correctAnswers: 3,
+        userId: 'mockUserId1', // Example owner
+        answers: [
+            { questionId: 'm1', questionText: 'If 2x + 3 = 7, what is x?', userAnswerId: 'm1b', correctAnswerId: 'm1b', explanation: '2x = 4, x = 2', options: [{id: 'm1a', text: '1'}, {id: 'm1b', text: '2'}, {id: 'm1c', text: '3'}, {id: 'm1d', text: '4'}], isCorrect: true, section: 'Math' },
+            { questionId: 'r1', questionText: 'What is the main idea of the passage?', userAnswerId: 'r1a', correctAnswerId: 'r1c', explanation: 'The main idea is C because...', options: [{id: 'r1a', text: 'Option A'}, {id: 'r1b', text: 'Option B'}, {id: 'r1c', text: 'Correct C'}, {id: 'r1d', text: 'Option D'}], isCorrect: false, section: 'Reading' },
+            { questionId: 'w1', questionText: 'Choose the best correction: dog, chased the ball.', userAnswerId: 'w1d', correctAnswerId: 'w1d', explanation: 'Explanation for W1...', options: [{id: 'w1a', text: 'dog chased'}, {id: 'w1b', text: 'dog, chased,'}, {id: 'w1c', text: 'dog chased,'}, {id: 'w1d', text: 'dog chased'}], isCorrect: true, section: 'Writing' },
+            { questionId: 'm2', questionText: 'What is the area of a circle with radius 3?', userAnswerId: 'm2b', correctAnswerId: 'm2b', explanation: 'Area = πr², so π(3)² = 9π', options: [{id: 'm2a', text: '6π'}, {id: 'm2b', text: '9π'}, {id: 'm2c', text: '3π'}, {id: 'm2d', text: '27π'}], isCorrect: true, section: 'Math' },
+        ],
+      },
+      'result2': {
+         id: 'result2',
+         testType: 'Math',
+         dateCompleted: new Date(Date.now() - 3 * 86400000),
+         score: 90,
+         totalQuestions: 10,
+         correctAnswers: 9,
+         userId: 'mockUserId1',
+         answers: [], // Empty for simplicity in mock
+       },
+       'result3': {
+         id: 'result3',
+         testType: 'Reading',
+         dateCompleted: new Date(Date.now() - 7 * 86400000),
+         score: 60,
+         totalQuestions: 5,
+         correctAnswers: 3,
+          userId: 'mockUserId2', // Different owner
+         answers: [], // Empty for simplicity in mock
+       },
+       'latest': { // Alias for result1
+         id: 'result1',
+         testType: 'Full',
+         dateCompleted: new Date(Date.now() - 86400000),
+         score: 75,
+         totalQuestions: 4,
+         correctAnswers: 3,
+          userId: 'mockUserId1',
+         answers: [
+            { questionId: 'm1', questionText: 'If 2x + 3 = 7, what is x?', userAnswerId: 'm1b', correctAnswerId: 'm1b', explanation: '2x = 4, x = 2', options: [{id: 'm1a', text: '1'}, {id: 'm1b', text: '2'}, {id: 'm1c', text: '3'}, {id: 'm1d', text: '4'}], isCorrect: true, section: 'Math' },
+            { questionId: 'r1', questionText: 'What is the main idea of the passage?', userAnswerId: 'r1a', correctAnswerId: 'r1c', explanation: 'The main idea is C because...', options: [{id: 'r1a', text: 'Option A'}, {id: 'r1b', text: 'Option B'}, {id: 'r1c', text: 'Correct C'}, {id: 'r1d', text: 'Option D'}], isCorrect: false, section: 'Reading' },
+            { questionId: 'w1', questionText: 'Choose the best correction: dog, chased the ball.', userAnswerId: 'w1d', correctAnswerId: 'w1d', explanation: 'Explanation for W1...', options: [{id: 'w1a', text: 'dog chased'}, {id: 'w1b', text: 'dog, chased,'}, {id: 'w1c', text: 'dog chased,'}, {id: 'w1d', text: 'dog chased'}], isCorrect: true, section: 'Writing' },
+            { questionId: 'm2', questionText: 'What is the area of a circle with radius 3?', userAnswerId: 'm2b', correctAnswerId: 'm2b', explanation: 'Area = πr², so π(3)² = 9π', options: [{id: 'm2a', text: '6π'}, {id: 'm2b', text: '9π'}, {id: 'm2c', text: '3π'}, {id: 'm2d', text: '27π'}], isCorrect: true, section: 'Math' },
+         ],
+       },
+  };
 
-  return null; // Result not found
+  return mockResults[resultId] || null; // Result not found
 }
 
 // --- Component ---
@@ -82,47 +104,69 @@ async function fetchDetailedTestResult(resultId: string): Promise<TestResultDeta
 export default function ResultDetailsPage() {
   const params = useParams();
   const router = useRouter();
-  const { currentUser } = useAuth();
+  const { currentUser, isGuest, loading: authLoading } = useAuth();
   const resultId = params.resultId as string;
 
   const [resultDetails, setResultDetails] = useState<TestResultDetails | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [loadingData, setLoadingData] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [accessDenied, setAccessDenied] = useState(false);
 
   useEffect(() => {
-    if (!resultId) return;
+    if (authLoading || !resultId) return; // Wait for auth state and resultId
 
-    const loadResultDetails = async () => {
-      setLoading(true);
-      setError(null);
-      try {
-        const details = await fetchDetailedTestResult(resultId);
-        if (details) {
-          setResultDetails(details);
-        } else {
-          setError("Test result not found.");
+    if (isGuest) {
+      // Guests cannot view detailed results
+       setAccessDenied(true);
+       setLoadingData(false);
+       return;
+    }
+
+     // Logged-in user, proceed to fetch data
+     setAccessDenied(false);
+     const loadResultDetails = async () => {
+        setLoadingData(true);
+        setError(null);
+        try {
+            const details = await fetchDetailedTestResult(resultId);
+            if (details) {
+                // Optional: Check if currentUser.uid matches details.userId if privacy is strict
+                // if (details.userId && details.userId !== currentUser?.uid) {
+                //   setError("You do not have permission to view this result.");
+                //   setResultDetails(null);
+                // } else {
+                setResultDetails(details);
+                // }
+            } else {
+                setError("Test result not found.");
+                 setResultDetails(null);
+            }
+        } catch (err) {
+            console.error("Failed to load result details:", err);
+            setError("Could not load the test result details. Please try again later.");
+             setResultDetails(null);
+        } finally {
+            setLoadingData(false);
         }
-      } catch (err) {
-        console.error("Failed to load result details:", err);
-        setError("Could not load the test result details. Please try again later.");
-      } finally {
-        setLoading(false);
-      }
-    };
-    loadResultDetails();
-  }, [resultId]);
+        };
+        loadResultDetails();
+  }, [resultId, isGuest, authLoading, currentUser?.uid]); // Add currentUser?.uid if ownership check is needed
+
 
   const getOptionTextById = (options: AnswerDetail['options'], id: string | null): string => {
       if (!id) return 'Not Answered';
       return options.find(opt => opt.id === id)?.text || 'Unknown Option';
   }
 
-  const canViewExplanation = currentUser?.subscriptionTier === 'premium' || currentUser?.subscriptionTier === 'high-end';
+   // Determine if the current user can view explanations based on their tier
+  const canViewExplanation = !isGuest && (currentUser?.subscriptionTier === 'premium' || currentUser?.subscriptionTier === 'high-end');
 
+  // Combined loading state
+   const isLoading = authLoading || loadingData;
 
-  if (loading) {
-    return (
-      <div className="container mx-auto py-8">
+   if (isLoading) {
+     return (
+       <div className="container mx-auto py-8">
          <Skeleton className="h-8 w-1/4 mb-2" />
          <Skeleton className="h-5 w-1/2 mb-8" />
          <Card>
@@ -141,24 +185,60 @@ export default function ResultDetailsPage() {
                  <Skeleton className="h-20 w-full" />
              </CardContent>
          </Card>
-      </div>
-    );
-  }
+       </div>
+     );
+   }
+
+    if (accessDenied) {
+        return (
+            <div className="container mx-auto py-8 text-center">
+                <Card className="max-w-md mx-auto">
+                    <CardHeader>
+                        <CardTitle className="flex items-center justify-center gap-2">
+                            <LogIn className="h-6 w-6" /> Access Required
+                        </CardTitle>
+                        <CardDescription>
+                             Please log in or sign up to view detailed test results and explanations.
+                        </CardDescription>
+                    </CardHeader>
+                    <CardContent className="flex flex-col gap-4">
+                        <Link href="/login" passHref legacyBehavior>
+                             <Button className="w-full">Login</Button>
+                        </Link>
+                         <Link href="/signup" passHref legacyBehavior>
+                            <Button variant="outline" className="w-full">Sign Up</Button>
+                        </Link>
+                         <Button variant="ghost" onClick={() => router.back()} className="mt-2">
+                           <ArrowLeft className="mr-2 h-4 w-4"/> Back
+                         </Button>
+                    </CardContent>
+                </Card>
+            </div>
+        );
+    }
+
 
   if (error) {
     return (
       <div className="container mx-auto py-8 text-center">
         <p className="text-destructive mb-4">{error}</p>
         <Link href="/results" passHref legacyBehavior>
-             <Button variant="outline"> <ArrowLeft className="mr-2 h-4 w-4"/> Back to Results</Button>
+             <Button variant="outline"> <ArrowLeft className="mr-2 h-4 w-4"/> Back to Results List</Button>
          </Link>
       </div>
     );
   }
 
   if (!resultDetails) {
-    // Should be caught by error state, but added for safety
-    return <div className="container mx-auto py-8 text-center">Result details not available.</div>;
+    // This case handles not found after loading/auth check
+    return (
+        <div className="container mx-auto py-8 text-center">
+            <p className="text-muted-foreground mb-4">Test result details not available.</p>
+             <Link href="/results" passHref legacyBehavior>
+                 <Button variant="outline"> <ArrowLeft className="mr-2 h-4 w-4"/> Back to Results List</Button>
+             </Link>
+        </div>
+    );
   }
 
    // Filter out questions if answers array is empty (for mock data simplicity)
@@ -166,8 +246,8 @@ export default function ResultDetailsPage() {
 
   return (
     <div className="container mx-auto py-8">
-       <Button variant="outline" size="sm" onClick={() => router.back()} className="mb-4">
-          <ArrowLeft className="mr-2 h-4 w-4"/> Back to Results
+       <Button variant="outline" size="sm" onClick={() => router.push('/results')} className="mb-4">
+          <ArrowLeft className="mr-2 h-4 w-4"/> Back to Results List
        </Button>
       <div className="mb-8">
         <h1 className="text-3xl font-bold">Test Results: {resultDetails.testType}</h1>
@@ -225,10 +305,23 @@ export default function ResultDetailsPage() {
                                 <p className="text-sm text-accent-foreground/90">{answer.explanation}</p>
                             ) : (
                                 <div className="text-sm text-accent-foreground/80 flex items-center justify-between">
-                                    <span> Detailed explanation available for Premium users.</span>
-                                    <Link href="/billing" passHref legacyBehavior>
-                                        <Button variant="link" size="sm" className="text-accent-foreground underline h-auto p-0">Upgrade Now</Button>
-                                    </Link>
+                                     {/* Different message for logged-in free users vs potential (but blocked) guests */}
+                                     {isGuest ? (
+                                         <span>Detailed explanation available for registered users.</span>
+                                     ) : (
+                                        <span>Detailed explanation available for Premium users.</span>
+                                     )}
+
+                                     {!isGuest && ( // Show upgrade only if logged in and not premium/high-end
+                                         <Link href="/billing" passHref legacyBehavior>
+                                             <Button variant="link" size="sm" className="text-accent-foreground underline h-auto p-0">Upgrade Now</Button>
+                                         </Link>
+                                     )}
+                                     {isGuest && ( // Show login/signup if guest
+                                         <Link href="/login" passHref legacyBehavior>
+                                             <Button variant="link" size="sm" className="text-accent-foreground underline h-auto p-0">Login/Sign Up</Button>
+                                         </Link>
+                                     )}
                                 </div>
                             )}
                         </div>
@@ -244,7 +337,7 @@ export default function ResultDetailsPage() {
                     <CardTitle>Detailed Review</CardTitle>
                 </CardHeader>
                 <CardContent>
-                    <p className="text-muted-foreground text-sm">Detailed answer review is not available for this test result.</p>
+                    <p className="text-muted-foreground text-sm">Detailed answer review is not available for this test result (mock data might be incomplete).</p>
                 </CardContent>
             </Card>
         )}

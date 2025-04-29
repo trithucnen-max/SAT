@@ -3,8 +3,8 @@
 import Link from 'next/link';
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { signInWithEmailAndPassword, signInWithPopup, GoogleAuthProvider } from 'firebase/auth';
-import { doc, getDoc, setDoc, updateDoc, serverTimestamp } from 'firebase/firestore';
+import { signInWithEmailAndPassword, signInWithPopup, GoogleAuthProvider, UserCredential, AuthError } from 'firebase/auth';
+import { doc, getDoc, setDoc, updateDoc, serverTimestamp, Timestamp } from 'firebase/firestore';
 import { useFirebase } from '@/context/FirebaseContext'; // Use Firebase context
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -33,9 +33,11 @@ const translations = {
     loginSuccessDesc: 'Welcome back!',
     loginFailTitle: 'Login Failed',
     googleFailTitle: 'Google Sign-In Failed',
-    googleFailDescDefault: 'Google Sign-In failed. Please try again. Ensure Google Sign-In is enabled in your Firebase project settings.',
+    googleFailDescDefault: 'Google Sign-In failed. Please try again.',
     googleFailDescCancelled: 'Sign-in cancelled.',
     googleFailDescExists: 'An account already exists with this email using a different sign-in method.',
+    googleFailDescPopupBlocked: "Pop-up blocked by browser. Please allow pop-ups for this site.",
+    firebaseInitError: 'Firebase services not available.',
   },
   vi: {
     loginTitle: 'Đăng nhập vào SPAT',
@@ -55,14 +57,16 @@ const translations = {
     loginSuccessDesc: 'Chào mừng trở lại!',
     loginFailTitle: 'Đăng nhập thất bại',
     googleFailTitle: 'Đăng nhập Google thất bại',
-    googleFailDescDefault: 'Đăng nhập bằng Google thất bại. Vui lòng thử lại. Đảm bảo rằng đăng nhập Google đã được bật trong cài đặt dự án Firebase của bạn.',
+    googleFailDescDefault: 'Đăng nhập bằng Google thất bại. Vui lòng thử lại.',
     googleFailDescCancelled: 'Đã hủy đăng nhập.',
     googleFailDescExists: 'Tài khoản đã tồn tại với email này bằng phương thức đăng nhập khác.',
+    googleFailDescPopupBlocked: "Cửa sổ bật lên bị chặn bởi trình duyệt. Vui lòng cho phép cửa sổ bật lên cho trang web này.",
+     firebaseInitError: 'Dịch vụ Firebase không khả dụng.',
   },
 };
 
 export default function LoginPage() {
-  const { auth, db, googleAuthProvider } = useFirebase(); // Get services and provider
+  const firebaseContext = useFirebase(); // Get services and provider
   const router = useRouter();
   const { toast } = useToast();
   const [email, setEmail] = useState('');
@@ -79,11 +83,12 @@ export default function LoginPage() {
     setLoadingEmail(true);
     setError(null);
 
-    if (!auth) {
-      setError("Firebase Auth is not initialized.");
+    if (!firebaseContext || !firebaseContext.auth) {
+      setError(strings.firebaseInitError);
       setLoadingEmail(false);
       return;
     }
+     const { auth } = firebaseContext;
 
     try {
       await signInWithEmailAndPassword(auth, email, password);
@@ -91,11 +96,16 @@ export default function LoginPage() {
         title: strings.loginSuccessTitle,
         description: strings.loginSuccessDesc,
       });
-      router.push('/dashboard');
+      router.push('/dashboard'); // Redirect on success
     } catch (err: any) {
       console.error("Login error:", err);
-      const message = err.message || 'Failed to log in. Please check your credentials.';
-      setError(message);
+       const authError = err as AuthError;
+       let message = authError.message || 'Failed to log in. Please check your credentials.';
+       // You can customize messages based on authError.code here
+       if (authError.code === 'auth/invalid-credential' || authError.code === 'auth/user-not-found' || authError.code === 'auth/wrong-password') {
+          message = 'Invalid email or password.';
+       }
+       setError(message);
       toast({
         title: strings.loginFailTitle,
         description: message,
@@ -107,50 +117,58 @@ export default function LoginPage() {
   };
 
   const handleGoogleSignIn = async () => {
-    if (!auth || !db || !googleAuthProvider) {
-        // Ensure Firebase services and the Google Auth Provider are available
-        setError("Firebase services not available.");
-        toast({
-            title: strings.googleFailTitle,
-            description: "Firebase services not available. Please check configuration.",
-            variant: 'destructive',
-        });
-        return;
-    }
     setLoadingGoogle(true);
     setError(null);
+
+    if (!firebaseContext || !firebaseContext.auth || !firebaseContext.db || !firebaseContext.googleAuthProvider) {
+        setError(strings.firebaseInitError);
+        toast({
+            title: strings.googleFailTitle,
+            description: strings.firebaseInitError,
+            variant: 'destructive',
+        });
+        setLoadingGoogle(false);
+        return;
+    }
+
+    const { auth, db, googleAuthProvider } = firebaseContext;
     const provider = new googleAuthProvider(); // Instantiate the provider
 
     try {
-        const result = await signInWithPopup(auth, provider);
+        const result: UserCredential = await signInWithPopup(auth, provider);
         const user = result.user;
 
-        // Check if user document exists, create or update as needed
+        // Prepare user data for Firestore
+        const userData = {
+            uid: user.uid,
+            email: user.email,
+            displayName: user.displayName || user.email, // Use email as fallback display name
+            photoURL: user.photoURL,
+            lastLogin: serverTimestamp() as Timestamp, // Use Firestore Timestamp
+            // subscriptionTier is set only if the doc is created new
+        };
+
         const userDocRef = doc(db, 'users', user.uid);
         const docSnap = await getDoc(userDocRef);
 
         if (!docSnap.exists()) {
-            // New user via Google Sign-In
+            // New user via Google Sign-In: Set document with initial free tier
             await setDoc(userDocRef, {
-                uid: user.uid,
-                email: user.email,
-                displayName: user.displayName,
-                photoURL: user.photoURL,
-                createdAt: serverTimestamp(),
-                subscriptionTier: 'free', // Default tier for new users
-                lastLogin: serverTimestamp(),
+                ...userData,
+                createdAt: serverTimestamp() as Timestamp,
+                subscriptionTier: 'free',
             });
             toast({
                 title: strings.loginSuccessTitle,
                 description: 'Welcome to SPAT!',
             });
         } else {
-            // Existing user logging in via Google
-             await updateDoc(userDocRef, {
-                 // Update potentially changed info from Google profile
-                 displayName: user.displayName,
-                 photoURL: user.photoURL,
-                 lastLogin: serverTimestamp(),
+            // Existing user logging in via Google: Update relevant fields
+            await updateDoc(userDocRef, {
+                 displayName: userData.displayName,
+                 photoURL: userData.photoURL,
+                 lastLogin: userData.lastLogin,
+                 // Do NOT overwrite subscriptionTier or createdAt on login
             });
             toast({
                 title: strings.loginSuccessTitle,
@@ -160,16 +178,25 @@ export default function LoginPage() {
         router.push('/dashboard'); // Redirect after successful sign-in/update
     } catch (error: any) {
         console.error("Google Sign-In error:", error);
+        const authError = error as AuthError;
         let message = strings.googleFailDescDefault;
-        // Handle specific Firebase Auth errors for Google Sign-In
-        if (error.code === 'auth/popup-closed-by-user' || error.code === 'auth/cancelled-popup-request') {
-            message = strings.googleFailDescCancelled;
-        } else if (error.code === 'auth/account-exists-with-different-credential') {
-             message = strings.googleFailDescExists;
-        } else if (error.code === 'auth/popup-blocked') {
-             message = "Pop-up blocked by browser. Please allow pop-ups for this site.";
+
+        switch (authError.code) {
+             case 'auth/popup-closed-by-user':
+             case 'auth/cancelled-popup-request':
+                 message = strings.googleFailDescCancelled;
+                 break;
+             case 'auth/account-exists-with-different-credential':
+                 message = strings.googleFailDescExists;
+                 break;
+             case 'auth/popup-blocked':
+                 message = strings.googleFailDescPopupBlocked;
+                 break;
+             // Add other specific error codes as needed
+             default:
+                  message = authError.message || message; // Use Firebase's message if available
+                  break;
         }
-        // Add other specific error codes as needed
 
         setError(message);
         toast({
@@ -219,7 +246,7 @@ export default function LoginPage() {
                 disabled={loadingEmail || loadingGoogle}
               />
             </div>
-            {error && <p className="text-sm text-destructive">{error}</p>}
+            {error && <p className="text-sm text-destructive text-center">{error}</p>}
             <Button type="submit" className="w-full" disabled={loadingEmail || loadingGoogle}>
               {loadingEmail ? strings.loggingInButton : strings.loginButton}
             </Button>
@@ -231,15 +258,14 @@ export default function LoginPage() {
             <Separator className="flex-grow" />
           </div>
 
-          {/* Ensure Firebase is configured correctly in the Firebase console for Google Sign-In */}
           <Button
             variant="outline"
-            className="w-full"
+            className="w-full flex items-center justify-center gap-2" // Added flex utilities
             onClick={handleGoogleSignIn}
             disabled={loadingEmail || loadingGoogle}
           >
             {/* Basic Google Icon SVG */}
-             <svg className="mr-2 h-4 w-4" aria-hidden="true" focusable="false" data-prefix="fab" data-icon="google" role="img" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 488 512"><path fill="currentColor" d="M488 261.8C488 403.3 381.7 512 244 512 109.8 512 0 402.2 0 261.8 0 120.3 109.8 11.8 244 11.8c70.3 0 136.5 28.7 184.4 75.4l-62.9 54.7C334.5 106.4 295.6 86.8 244 86.8c-66.8 0-123 54.4-123 121.3 0 66.9 56.2 121.4 123 121.4 72.9 0 100.7-47.8 105.3-71.4H244V245.5h132.3c1.9 10.8 3.1 21.9 3.1 34.1 0 16.2-3.1 32.4-9.4 47.8z"></path></svg>
+             <svg className="h-4 w-4" aria-hidden="true" focusable="false" data-prefix="fab" data-icon="google" role="img" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 488 512"><path fill="currentColor" d="M488 261.8C488 403.3 381.7 512 244 512 109.8 512 0 402.2 0 261.8 0 120.3 109.8 11.8 244 11.8c70.3 0 136.5 28.7 184.4 75.4l-62.9 54.7C334.5 106.4 295.6 86.8 244 86.8c-66.8 0-123 54.4-123 121.3 0 66.9 56.2 121.4 123 121.4 72.9 0 100.7-47.8 105.3-71.4H244V245.5h132.3c1.9 10.8 3.1 21.9 3.1 34.1 0 16.2-3.1 32.4-9.4 47.8z"></path></svg>
             {loadingGoogle ? strings.googleSigningInButton : strings.googleSignInButton}
           </Button>
 
@@ -250,9 +276,10 @@ export default function LoginPage() {
             </Link>
           </div>
           <div className="mt-2 text-center text-sm">
-            <Link href="/" className="underline text-muted-foreground">
-              {strings.backToHome}
-            </Link>
+             {/* Link back to dashboard for guests or home for logged out */}
+             <Link href="/" className="underline text-muted-foreground">
+               {strings.backToHome}
+             </Link>
           </div>
         </CardContent>
       </Card>

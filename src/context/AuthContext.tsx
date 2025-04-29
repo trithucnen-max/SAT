@@ -4,15 +4,14 @@ import type React from 'react';
 import { createContext, useState, useEffect, useContext } from 'react';
 import type { User } from 'firebase/auth';
 import { onAuthStateChanged } from 'firebase/auth';
-import { doc, getDoc, onSnapshot } from 'firebase/firestore';
+import { doc, onSnapshot } from 'firebase/firestore';
 import { useFirebase } from './FirebaseContext';
-import { Skeleton } from '@/components/ui/skeleton'; // For loading state
 
 // Define subscription tiers
 export type SubscriptionTier = 'free' | 'premium' | 'high-end';
 
 // Extend Firebase User type with custom claims if needed, e.g., subscription tier
-interface AppUser extends User {
+export interface AppUser extends User {
   subscriptionTier?: SubscriptionTier;
   // Add other custom user properties if needed
 }
@@ -20,83 +19,79 @@ interface AppUser extends User {
 interface AuthContextType {
   currentUser: AppUser | null;
   loading: boolean;
+  isGuest: boolean; // Flag to identify guest users
 }
 
 const AuthContext = createContext<AuthContextType>({
   currentUser: null,
   loading: true,
+  isGuest: true, // Default to guest until proven otherwise
 });
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { auth, db } = useFirebase();
   const [currentUser, setCurrentUser] = useState<AppUser | null>(null);
   const [loading, setLoading] = useState(true);
+  const [isGuest, setIsGuest] = useState(true);
 
   useEffect(() => {
-    const unsubscribeAuth = onAuthStateChanged(auth, async (user) => {
+    const unsubscribeAuth = onAuthStateChanged(auth, (user) => {
       if (user) {
-        // User is signed in, now fetch custom data like subscription tier
+        setIsGuest(false);
         const userDocRef = doc(db, 'users', user.uid);
-        try {
-           // Use onSnapshot for real-time updates to user data (e.g., subscription changes)
-          const unsubscribeSnapshot = onSnapshot(userDocRef, (docSnap) => {
-             if (docSnap.exists()) {
-                const userData = docSnap.data();
-                setCurrentUser({
-                ...user,
-                subscriptionTier: userData.subscriptionTier || 'free', // Default to 'free' if not set
-                // Add other custom properties here
-                });
-            } else {
-                // Handle case where user document doesn't exist (might happen on first login)
-                setCurrentUser({ ...user, subscriptionTier: 'free' });
-            }
-            setLoading(false);
-          });
-
-          // Return the snapshot listener cleanup function
-          return () => unsubscribeSnapshot();
-
-        } catch (error) {
-          console.error("Error fetching user data:", error);
-          // Fallback: Set user without custom data
-          setCurrentUser({ ...user, subscriptionTier: 'free' });
+        const unsubscribeSnapshot = onSnapshot(userDocRef, (docSnap) => {
+          if (docSnap.exists()) {
+            const userData = docSnap.data();
+            setCurrentUser({
+              ...user,
+              subscriptionTier: userData.subscriptionTier || 'free',
+            });
+          } else {
+            // Handle case where user document might not exist immediately after creation
+            // We might want to create it here if it's missing, but for now, assume 'free' tier
+            setCurrentUser({ ...user, subscriptionTier: 'free' });
+            // Consider creating the doc here: setDoc(userDocRef, { /* initial data */ });
+             console.warn(`User document for ${user.uid} not found, defaulting to free tier.`);
+          }
           setLoading(false);
-        }
+        }, (error) => {
+           console.error("Error listening to user document:", error);
+           // Fallback if snapshot fails
+           setCurrentUser({ ...user, subscriptionTier: 'free' });
+           setLoading(false);
+        });
+
+        // Return the snapshot listener cleanup function
+        return () => unsubscribeSnapshot();
       } else {
-        // User is signed out
+        // User is signed out (Guest)
         setCurrentUser(null);
+        setIsGuest(true);
         setLoading(false);
       }
+    }, (error) => {
+        // Handle potential errors during initial auth state check
+        console.error("Auth state change error:", error);
+        setCurrentUser(null);
+        setIsGuest(true);
+        setLoading(false);
     });
 
-    // Cleanup subscription on unmount
+    // Cleanup auth subscription on unmount
     return () => unsubscribeAuth();
   }, [auth, db]);
 
-  // Display loading state while checking auth status
-  if (loading) {
-     return (
-        <div className="flex items-center justify-center min-h-screen">
-            <div className="flex flex-col space-y-3 items-center">
-                <Skeleton className="h-[125px] w-[250px] rounded-xl" />
-                <div className="space-y-2">
-                    <Skeleton className="h-4 w-[250px]" />
-                    <Skeleton className="h-4 w-[200px]" />
-                </div>
-                 <Skeleton className="h-10 w-[100px] mt-4" />
-            </div>
-        </div>
-    );
-  }
-
   return (
-    <AuthContext.Provider value={{ currentUser, loading }}>
+    <AuthContext.Provider value={{ currentUser, loading, isGuest }}>
       {children}
     </AuthContext.Provider>
   );
 };
 
 export const useAuth = () => {
-  return useContext(AuthContext);
+  const context = useContext(AuthContext);
+  if (context === undefined) {
+     throw new Error('useAuth must be used within an AuthProvider');
+  }
+  return context;
 };

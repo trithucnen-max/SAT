@@ -5,19 +5,24 @@ import { usePathname } from 'next/navigation';
 import { Home, FileText, BarChart3, BookOpen, Settings, CreditCard } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { SidebarMenu, SidebarMenuItem, SidebarMenuButton } from '@/components/ui/sidebar'; // Import Sidebar components
+import { useAuth } from '@/context/AuthContext';
 
 
 export default function AppSidebarNavigation() {
     const pathname = usePathname();
+    const { isGuest } = useAuth();
 
-    const navItems = [
-        { href: '/dashboard', label: 'Dashboard', icon: Home },
-        { href: '/practice', label: 'Practice Tests', icon: FileText },
-        { href: '/results', label: 'Results', icon: BarChart3 },
-        { href: '/materials', label: 'Study Materials', icon: BookOpen },
-        { href: '/billing', label: 'Billing', icon: CreditCard },
-        { href: '/profile', label: 'Profile', icon: Settings }, // Combined profile/settings for now
+    const allNavItems = [
+        { href: '/dashboard', label: 'Dashboard', icon: Home, guestAccess: true },
+        { href: '/practice', label: 'Practice Tests', icon: FileText, guestAccess: true },
+        { href: '/results', label: 'Results', icon: BarChart3, guestAccess: true }, // Allow access to list, details page will guard
+        { href: '/materials', label: 'Study Materials', icon: BookOpen, guestAccess: true },
+        { href: '/billing', label: 'Billing', icon: CreditCard, guestAccess: false },
+        { href: '/profile', label: 'Profile', icon: Settings, guestAccess: false }, // Combined profile/settings for now
     ];
+
+    const navItems = allNavItems.filter(item => item.guestAccess || !isGuest);
+
 
     return (
         <SidebarMenu>

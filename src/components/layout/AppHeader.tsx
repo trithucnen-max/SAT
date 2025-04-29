@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { CircleUser, Menu } from 'lucide-react';
+import { CircleUser, Menu, LogIn } from 'lucide-react'; // Added LogIn
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -21,7 +21,7 @@ import { useToast } from '@/hooks/use-toast';
 import { SidebarTrigger } from '@/components/ui/sidebar';
 
 export default function AppHeader() {
-  const { currentUser } = useAuth();
+  const { currentUser, isGuest } = useAuth();
   const { auth } = useFirebase();
   const router = useRouter();
   const { toast } = useToast();
@@ -51,7 +51,7 @@ export default function AppHeader() {
             <SheetContent side="left" className="sm:max-w-xs bg-sidebar text-sidebar-foreground">
                 <nav className="grid gap-6 text-lg font-medium mt-8">
                 <Link
-                    href="#"
+                    href="/dashboard" // Link to dashboard
                     className="group flex h-10 w-10 shrink-0 items-center justify-center gap-2 rounded-full bg-primary text-lg font-semibold text-primary-foreground md:text-base"
                     prefetch={false}
                 >
@@ -73,6 +73,20 @@ export default function AppHeader() {
                     <span className="sr-only">SPAT</span>
                 </Link>
                 <AppSidebarNavigation />
+                 {/* Add Login/Logout in mobile sheet */}
+                 <div className="mt-auto">
+                      {isGuest ? (
+                          <Link href="/login" passHref legacyBehavior>
+                              <Button variant="outline" className="w-full justify-start gap-2">
+                                 <LogIn className="h-4 w-4" /> Login / Sign Up
+                              </Button>
+                           </Link>
+                      ) : (
+                           <Button variant="ghost" className="w-full justify-start gap-2" onClick={handleLogout}>
+                              <Menu className="h-4 w-4" /> Logout
+                           </Button> // Assuming LogOut icon exists
+                      )}
+                 </div>
                 </nav>
             </SheetContent>
         </Sheet>
@@ -83,37 +97,43 @@ export default function AppHeader() {
         </div>
 
 
-      {/* Spacer to push user menu to the right */}
+      {/* Spacer to push user menu/login button to the right */}
       <div className="ml-auto flex items-center gap-2">
-        {/* User Dropdown */}
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="secondary" size="icon" className="rounded-full">
-              <CircleUser className="h-5 w-5" />
-              <span className="sr-only">Toggle user menu</span>
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            <DropdownMenuLabel>My Account</DropdownMenuLabel>
-            <DropdownMenuSeparator />
-             {currentUser?.email && <DropdownMenuItem disabled>{currentUser.email}</DropdownMenuItem>}
-             <DropdownMenuItem disabled className="capitalize text-xs text-muted-foreground">
-                Tier: {currentUser?.subscriptionTier || 'Free'}
-            </DropdownMenuItem>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem asChild>
-              <Link href="/profile">Profile</Link>
-            </DropdownMenuItem>
-             <DropdownMenuItem asChild>
-              <Link href="/settings">Settings</Link>
-            </DropdownMenuItem>
-             <DropdownMenuItem asChild>
-              <Link href="/billing">Billing</Link>
-            </DropdownMenuItem>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem onClick={handleLogout}>Logout</DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
+         {isGuest ? (
+             <Link href="/login" passHref legacyBehavior>
+                 <Button variant="outline">
+                      <LogIn className="mr-2 h-4 w-4" /> Login / Sign Up
+                 </Button>
+            </Link>
+         ) : (
+            /* User Dropdown for logged-in users */
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="secondary" size="icon" className="rounded-full">
+                  <CircleUser className="h-5 w-5" />
+                  <span className="sr-only">Toggle user menu</span>
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuLabel>My Account</DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                {currentUser?.email && <DropdownMenuItem disabled>{currentUser.email}</DropdownMenuItem>}
+                <DropdownMenuItem disabled className="capitalize text-xs text-muted-foreground">
+                    Tier: {currentUser?.subscriptionTier || 'Free'}
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem asChild>
+                  <Link href="/profile">Profile</Link>
+                </DropdownMenuItem>
+                 <DropdownMenuItem asChild>
+                  <Link href="/billing">Billing</Link>
+                </DropdownMenuItem>
+                 {/* Removed Settings link from dropdown, keep Profile */}
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={handleLogout}>Logout</DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+         )}
       </div>
     </header>
   );

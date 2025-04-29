@@ -9,7 +9,7 @@ import {
 } from '@/components/ui/sidebar';
 import AppSidebarNavigation from './AppSidebarNavigation';
 import { Button } from '@/components/ui/button';
-import { LogOut } from 'lucide-react';
+import { LogOut, LogIn } from 'lucide-react'; // Added LogIn for guests
 import { useAuth } from '@/context/AuthContext';
 import { signOut } from 'firebase/auth';
 import { useFirebase } from '@/context/FirebaseContext';
@@ -18,6 +18,7 @@ import { useToast } from '@/hooks/use-toast';
 
 export default function AppSidebar() {
   const { auth } = useFirebase();
+  const { isGuest } = useAuth(); // Get guest status
   const router = useRouter();
   const { toast } = useToast();
 
@@ -26,12 +27,17 @@ export default function AppSidebar() {
     try {
       await signOut(auth);
       toast({ title: 'Logged Out', description: 'You have been successfully logged out.' });
-      router.push('/login');
+      router.push('/login'); // Redirect to login after logout
     } catch (error) {
       console.error('Logout failed:', error);
        toast({ title: 'Logout Failed', description: 'Could not log you out. Please try again.', variant: 'destructive' });
     }
   };
+
+    const handleLoginRedirect = () => {
+        router.push('/login');
+    };
+
 
   return (
     <Sidebar className="border-r" collapsible="icon" variant="sidebar">
@@ -62,11 +68,19 @@ export default function AppSidebar() {
         </nav>
       </SidebarContent>
         <SidebarFooter className="mt-auto p-4 border-t">
-            <Button variant="ghost" className="w-full justify-start gap-2" onClick={handleLogout}>
-             <LogOut className="h-4 w-4" />
-              <span className="group-data-[state=collapsed]:hidden">Logout</span>
-              <span className="sr-only group-data-[state=expanded]:hidden">Logout</span>
-            </Button>
+            {isGuest ? (
+                <Button variant="outline" className="w-full justify-start gap-2" onClick={handleLoginRedirect}>
+                    <LogIn className="h-4 w-4" />
+                    <span className="group-data-[state=collapsed]:hidden">Login / Sign Up</span>
+                    <span className="sr-only group-data-[state=expanded]:hidden">Login / Sign Up</span>
+                </Button>
+            ) : (
+                 <Button variant="ghost" className="w-full justify-start gap-2" onClick={handleLogout}>
+                    <LogOut className="h-4 w-4" />
+                    <span className="group-data-[state=collapsed]:hidden">Logout</span>
+                    <span className="sr-only group-data-[state=expanded]:hidden">Logout</span>
+                </Button>
+            )}
       </SidebarFooter>
     </Sidebar>
   );
