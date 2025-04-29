@@ -32,12 +32,8 @@ export default function RootLayout({
           // Removed the direct font variable here as it's applied to <html>
         )}
       >
-        <FirebaseProvider>
-          {' '}
-          {/* Wrap with FirebaseProvider */}
-          <AuthProvider>
-            {' '}
-            {/* Wrap with AuthProvider */}
+        <FirebaseProvider> {/* Wrap with FirebaseProvider */}
+          <AuthProvider> {/* Wrap with AuthProvider */}
             {children}
             <Toaster />
           </AuthProvider>
