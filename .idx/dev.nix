@@ -7,12 +7,18 @@
   packages = [
     pkgs.nodejs_20
   ];
+  
+  # 1. Kích hoạt dịch vụ Docker chạy ngầm trong workspace
+  services.docker.enable = true;
+
   # Sets environment variables in the workspace
   env = {};
   idx = {
     # Search for the extensions you want on https://open-vsx.org/ and use "publisher.id"
     extensions = [
       # "vscodevim.vim"
+      # 2. Thêm extension để quản lý Docker trực quan trên thanh sidebar
+      "ms-azuretools.vscode-docker"
     ];
     workspace = {
       onCreate = {
